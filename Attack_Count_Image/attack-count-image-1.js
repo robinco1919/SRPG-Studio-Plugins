@@ -176,11 +176,13 @@ UIBattleLayout._getAttackCount = function(unit, targetUnit, isSrc) {
 	
 	if (isSrc) {
 		roundAttackCount = Calculator.calculateRoundCount(unit, targetUnit,  BattlerChecker.getRealBattleWeapon(unit));
+		roundAttackCount *= Calculator.calculateAttackCount(unit, targetUnit, BattlerChecker.getRealBattleWeapon(unit));
 	}
 	else {
 		isCounterattack = this._realBattle.getAttackInfo().isCounterattack;
 		if (isCounterattack) {
 			roundAttackCount = Calculator.calculateRoundCount(targetUnit, unit,  BattlerChecker.getRealBattleWeapon(targetUnit));
+			roundAttackCount *= Calculator.calculateAttackCount(targetUnit, unit, BattlerChecker.getRealBattleWeapon(targetUnit));
 		}
 		else {
 			roundAttackCount = 1;
