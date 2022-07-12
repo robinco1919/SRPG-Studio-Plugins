@@ -32,7 +32,7 @@
 
 // Info for turn icons in window
 var BWSICON_SETTING = {
-	  Folder     : 'BWS_turn'
+	  Folder     : 'BWS_turn_icons'
 	, Img        : 'bws_turn_icons.png'
 	, IconWidth  : 24
 	, IconHeight : 24
