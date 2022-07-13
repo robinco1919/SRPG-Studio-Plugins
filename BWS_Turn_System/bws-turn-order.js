@@ -12,9 +12,10 @@
 	  This contains very basic icons for the turn order list, which you can
 	  feel free to change.
 	
-	Important notes:
+	Important notes/known issues:
 	- Set scroll speed in the Config to normal/slow (fast has some visual 
 	  bugs which I haven't worked out yet)
+	- There may be a problem with refreshers if they move last
 	- Consider turning on unit markers and/or HP bars to see unit 
 	  affiliation for waiting units
 	- You may also want to update the Player Phase graphic to something that
@@ -26,9 +27,15 @@
 	- Also feel free to edit the plugin as you please
 	 
 	 Release History:
-	 12/07/2022: v0.1, first beta release
-	 13/07/2022: v0.2, no action/auto AI/berserk states should be functioning
-					   correctly now
+	 12/07/2022: v0.1, 
+		- First beta release
+	 13/07/2022: v0.2, 
+		- No action/auto AI/berserk states should be functioning
+		  correctly now (berserked units move at the end of the turn)
+		- Slight change to reinforcements (they appear at end of turn)
+		- Bug fix where player leaves the map before finishing their action 
+		  (e.g. dying to a counterattack, leaving via an event command). 
+		  The turn list is now update correctly in these scenarios
 					   
 --------------------------------------------------------------------------*/
 
@@ -721,7 +728,6 @@ TurnChangeStart.pushFlowEntries = function(straightFlow) {
 	// maybe need another check here for berserked uits etc. 
 	// bewcause this is being called too many times
 	if (BWSTurnSystem.turnList.length === totalUnits) {// || root.getCurrentSession().getTurnCount() === 0) {
-		// note any turn 1 reinforcements won't appear at all, but who does turn 1 reinforcements lol
 		if (this._isTurnAnimeEnabled()) {
 			straightFlow.pushFlowEntry(TurnAnimeFlowEntry); // using an animation (resource location/animations)
 		}
@@ -1026,6 +1032,54 @@ TurnChangeEnd._startNextTurn = function() {
 	root.getCurrentSession().setTurnType(nextTurnType);
 };
 
+// in case an attacking player dies, make change here
+MapSequenceCommand._doLastAction = function() {
+	var i;
+	var unit = null;
+	var list = PlayerList.getSortieList();
+	var count = list.getCount();
+	root.log('fuck do last action')
+	
+	// Check it because the unit may not exist by executing a command.
+	for (i = 0; i < count; i++) {
+		if (this._targetUnit === list.getData(i)) {
+			unit = this._targetUnit;
+			break;
+		}
+	}	
+	
+	// Check if the unit doesn't die and still exists.
+	if (unit !== null) {
+		if (this._unitCommandManager.getExitCommand() !== null) {
+			if (!this._unitCommandManager.isRepeatMovable()) {
+				// If move again is not allowed, don't move again.
+				this._targetUnit.setMostResentMov(ParamBonus.getMov(this._targetUnit));
+			}
+			
+			// Set the wait state because the unit did some action.
+			this._parentTurnObject.recordPlayerAction(true);
+			return 0;
+		}
+		else {
+			// Get the position and cursor back because the unit didn't act.
+			this._parentTurnObject.setPosValue(unit);
+		}	
+		
+		// Face forward.
+		unit.setDirection(DirectionType.NULL);
+	}
+	else {
+		this._parentTurnObject.recordPlayerAction(true);
+		// if unit is dead, shift list
+		BWSTurnSystem.shiftList();
+		root.log(BWSTurnSystem.turnList);			
+		return 1;
+	}
+
+	
+	return 2;
+};
+
 
 ReactionFlowEntry._completeMemberData = function(playerTurn) {
 	var skill;
@@ -1035,6 +1089,7 @@ ReactionFlowEntry._completeMemberData = function(playerTurn) {
 	// note this will probably screw with move again skills, might be best to restructure this
 	// so that it checks for the skill proc first, otherwise we shift list and NOTENTER
 	// BUT only if not berserked since they don't use up turns
+	root.log('ReactionFlowEntry._completeMemberData')
 	if (StateControl.isTargetControllable(this._targetUnit)) {
 		BWSTurnSystem.shiftList();
 		root.log(BWSTurnSystem.turnList);			
