@@ -185,25 +185,20 @@ var BWSTurnSystem = {
 		// after a unit ends their action, remove first one in the list
 		this.turnList.shift();
 		
+		// moved elsewhere
 /* 		// if it's empty, start a new turn
 		if (this.turnList.length === 0) {
 			this.newTurn();
 			this.initialiseList();
 		} */
 		
-		// check that no. of unmoved units is equal to list length
-		// this can change due to unmoved units dying, units joining mid-phase, etc...
-		var numUnmovedPlayer = PlayerList.getUnmovedList().getCount();
-		var numUnmovedEnemy = EnemyList.getUnmovedList().getCount();
-		var numUnmovedAlly = AllyList.getUnmovedList().getCount();
-		
-		//root.log(this.turnList.length)
-		//root.log(numUnmovedPlayer+numUnmovedEnemy+numUnmovedAlly)
-		
-		if (this.turnList.length !== numUnmovedPlayer+numUnmovedEnemy+numUnmovedAlly) {
-			this.updateList(numUnmovedPlayer, numUnmovedEnemy, numUnmovedAlly);
-		}
-		
+		// calling it all the time, the function will sort out if there's anything
+		// which actually has to be done (i.e. changes iun number of units, changes in
+		// unit affilation, etc.)
+		// a little inelegant but w/e
+		this.updateList(); 
+	
+	
 		// do all the other fancy new turn stuff
 		// currently ending turn after each action (so can have multiple player phase/enemy phases in a row)
 		TurnControl.turnEnd();
@@ -248,69 +243,84 @@ var BWSTurnSystem = {
 		
 	},
 	
-	updateList: function(numPlayer, numEnemy, numAlly) {
+	updateList: function() {
 		// after a unit dies or leaves the map
 		// also perhaps if a unit joins mid-turn or swaps affiliations?
-		// might need to have some argument inputs
 		// we'll have to look at the affiliation of who has died/left, then remove the last(?) occurence of that affiliation
-		root.log('need to update list')
+		
+		// calling it all the time, the function will sort out
+		
+		var numPlayer = PlayerList.getUnmovedList().getCount();
+		var numEnemy = EnemyList.getUnmovedList().getCount();
+		var numAlly = AllyList.getUnmovedList().getCount();
+		var numPlayersInList = this.countType(TurnType.PLAYER);
+		var numEnemiesInList = this.countType(TurnType.ENEMY);;
+		var numAlliesInList = this.countType(TurnType.ALLY);;
+
+		root.log(numPlayer + ' / ' + numPlayersInList)
+		root.log(numEnemy + ' / ' + numEnemiesInList)
+		root.log(numAlly + ' / ' + numAlliesInList)
 		
 		// 1st case: number of player ne no of 0s in list
-		numPlayersInList = 0;
-		for (i = 0; i < this.turnList.length; i++) {
-			if (this.turnList[i] === TurnType.PLAYER) {
-				numPlayersInList += 1;
-			}
-		}
-		
+		// doing for rather than while loops in case I stuff up to avoid infinite loops
 		if (numPlayersInList > numPlayer) {
-			// remove the last 0
-			removeIndex = this.lastIndex(this.turnList, TurnType.PLAYER);
-			this.turnList.splice(removeIndex, 1);
+			for (i = 0; i < (numPlayersInList - numPlayer); i++) {
+				// remove the last 0
+				removeIndex = this.lastIndex(this.turnList, TurnType.PLAYER);
+				this.turnList.splice(removeIndex, 1);	
+			}
 		}
 		if (numPlayersInList < numPlayer) {
-			// add an extra 0 at the end
-			this.turnList.push(TurnType.PLAYER)
-		}
-		
-		numEnemiesInList = 0;
-		for (i = 0; i < this.turnList.length; i++) {
-			if (this.turnList[i] === TurnType.ENEMY) {
-				numEnemiesInList += 1;
+			for (i = 0; i < (numPlayer - numPlayersInList); i++) {
+				// add an extra 0 at the end
+				this.turnList.push(TurnType.PLAYER)				
 			}
-		}		
+		}
 		
 		// 2nd case: number of enemy ne no of 1s in list
 		if (numEnemiesInList > numEnemy) {
-			// remove the last 1
-			removeIndex = this.lastIndex(this.turnList, TurnType.ENEMY);
-			this.turnList.splice(removeIndex, 1);
+			for (i = 0; i < (numEnemiesInList - numEnemy); i++) {
+				// remove the last 1
+				removeIndex = this.lastIndex(this.turnList, TurnType.ENEMY);
+				this.turnList.splice(removeIndex, 1);				
+			}
 		}
 		if (numEnemiesInList < numEnemy) {
-			// add an extra 1 at the end
-			this.turnList.push(TurnType.ENEMY)
-		}
-		
-		numAlliesInList = 0;
-		for (i = 0; i < this.turnList.length; i++) {
-			if (this.turnList[i] === TurnType.ALLY) {
-				numAlliesInList += 1;
+			for (i = 0; i < (numEnemy - numEnemiesInList); i++) {
+				// add an extra 1 at the end
+				this.turnList.push(TurnType.ENEMY)				
 			}
-		}	
+		}
+	
 		
 		// 3nd case: number of ally ne no of 2s in list
 		if (numAlliesInList > numAlly) {
-			// remove the last 2
-			removeIndex = this.lastIndex(this.turnList, TurnType.ALLY);
-			this.turnList.splice(removeIndex, 1);
+			for (i = 0; i < (numAlliesInList - numAlly); i++) {
+				// remove the last 2
+				removeIndex = this.lastIndex(this.turnList, TurnType.ALLY);
+				this.turnList.splice(removeIndex, 1);				
+			}
 		}
 		if (numAlliesInList < numAlly) {
-			// add an extra 2 at the end
-			this.turnList.push(TurnType.ALLY)
+			for (i = 0; i < (numAlly - numAlliesInList); i++) {
+				// add an extra 2 at the end
+				this.turnList.push(TurnType.ALLY)				
+			}
 		}
 		
-		root.log('now list is ' + this.turnList)
+		//root.log('now list is ' + this.turnList)
 		
+	},
+	
+	countType: function(turnType) {
+		// counts the number of a particular affiliation in the turn list
+		var numInList = 0;
+		for (i = 0; i < this.turnList.length; i++) {
+			if (this.turnList[i] === turnType) {
+				numInList += 1;
+			}
+		}
+		return numInList;
 	},
 	
 	// idk might need this function
@@ -728,6 +738,7 @@ TurnChangeStart.pushFlowEntries = function(straightFlow) {
 	// maybe need another check here for berserked uits etc. 
 	// bewcause this is being called too many times
 	if (BWSTurnSystem.turnList.length === totalUnits) {// || root.getCurrentSession().getTurnCount() === 0) {
+		straightFlow.pushFlowEntry(ReinforcementAppearFlowEntry);
 		if (this._isTurnAnimeEnabled()) {
 			straightFlow.pushFlowEntry(TurnAnimeFlowEntry); // using an animation (resource location/animations)
 		}
@@ -948,7 +959,7 @@ TurnChangeEnd.pushFlowEntries = function(straightFlow) {
 	// CHANGED NOW UHUHU HU
 	if (BWSTurnSystem.turnList.length === 0) {
 		straightFlow.pushFlowEntry(BerserkFlowEntry);
-		straightFlow.pushFlowEntry(ReinforcementAppearFlowEntry); // back to here
+		//straightFlow.pushFlowEntry(ReinforcementAppearFlowEntry); // here or TurnChangeStart?
 	}
 };
 
@@ -1038,7 +1049,6 @@ MapSequenceCommand._doLastAction = function() {
 	var unit = null;
 	var list = PlayerList.getSortieList();
 	var count = list.getCount();
-	root.log('fuck do last action')
 	
 	// Check it because the unit may not exist by executing a command.
 	for (i = 0; i < count; i++) {
@@ -1089,7 +1099,6 @@ ReactionFlowEntry._completeMemberData = function(playerTurn) {
 	// note this will probably screw with move again skills, might be best to restructure this
 	// so that it checks for the skill proc first, otherwise we shift list and NOTENTER
 	// BUT only if not berserked since they don't use up turns
-	root.log('ReactionFlowEntry._completeMemberData')
 	if (StateControl.isTargetControllable(this._targetUnit)) {
 		BWSTurnSystem.shiftList();
 		root.log(BWSTurnSystem.turnList);			
