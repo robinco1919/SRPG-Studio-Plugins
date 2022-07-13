@@ -36,6 +36,8 @@
 		- Bug fix where player leaves the map before finishing their action 
 		  (e.g. dying to a counterattack, leaving via an event command). 
 		  The turn list is now update correctly in these scenarios
+		- Bug fix for units which change affilation via an event --
+		  the turn list is now correctly updated
 					   
 --------------------------------------------------------------------------*/
 
