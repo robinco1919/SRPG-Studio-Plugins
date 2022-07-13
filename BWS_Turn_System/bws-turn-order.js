@@ -27,6 +27,8 @@
 	 
 	 Release History:
 	 12/07/2022: v0.1, first beta release
+	 13/07/2022: v0.2, no action/auto AI/berserk states should be functioning
+					   correctly now
 					   
 --------------------------------------------------------------------------*/
 
@@ -54,15 +56,15 @@ var BWSTurnSystem = {
 	// for now we have player = 0, enemy = 1, (later ally = 2)
 	// as defined TURNTYPE in constants-enumeratedtype.js
 	initialiseList: function() {
-		var numPlayer = PlayerList.getAliveList().getCount();
-		var numEnemy = EnemyList.getAliveList().getCount();
-		var numAlly = AllyList.getAliveList().getCount();
+		var numPlayer = PlayerList.getControllableList().getCount();
+		var numEnemy = EnemyList.getControllableList().getCount();
+		var numAlly = AllyList.getControllableList().getCount();
 		var totalUnits = numPlayer + numEnemy + numAlly;
 		
-		//root.log(numPlayer + ' players')
-		//root.log(numEnemy + ' enemies')
-		//root.log(numAlly + ' allies')
-		//root.log(totalUnits + ' total')
+		root.log(numPlayer + ' players')
+		root.log(numEnemy + ' enemies')
+		root.log(numAlly + ' allies')
+		root.log(totalUnits + ' total')
 		
 		this.turnList = []; // empty list
 		this.numUnitArray = [numPlayer, numEnemy, numAlly]; // might use this later
@@ -175,11 +177,13 @@ var BWSTurnSystem = {
 	shiftList: function() {
 		// after a unit ends their action, remove first one in the list
 		this.turnList.shift();
-		// if it's empty, start a new turn
+		
+/* 		// if it's empty, start a new turn
 		if (this.turnList.length === 0) {
 			this.newTurn();
 			this.initialiseList();
-		}
+		} */
+		
 		// check that no. of unmoved units is equal to list length
 		// this can change due to unmoved units dying, units joining mid-phase, etc...
 		var numUnmovedPlayer = PlayerList.getUnmovedList().getCount();
@@ -242,7 +246,7 @@ var BWSTurnSystem = {
 		// also perhaps if a unit joins mid-turn or swaps affiliations?
 		// might need to have some argument inputs
 		// we'll have to look at the affiliation of who has died/left, then remove the last(?) occurence of that affiliation
-		//root.log('need to update list')
+		root.log('need to update list')
 		
 		// 1st case: number of player ne no of 0s in list
 		numPlayersInList = 0;
@@ -298,7 +302,7 @@ var BWSTurnSystem = {
 			this.turnList.push(TurnType.ALLY)
 		}
 		
-		//root.log('now list is ' + this.turnList)
+		root.log('now list is ' + this.turnList)
 		
 	},
 	
@@ -324,7 +328,10 @@ var BWSTurnSystem = {
 
 AllUnitList.getUnmovedList = function(list) {
 	var funcCondition = function(unit) {
-		return unit.getAliveState() === AliveType.ALIVE && !unit.isWait() && FusionControl.getFusionParent(unit) === null;
+		return (unit.getAliveState() === AliveType.ALIVE && 
+		!unit.isWait() && 
+		FusionControl.getFusionParent(unit) === null &&
+		StateControl.isTargetControllable(unit)); // bad states, e.g. sleep where you don't control
 	};
 		
 	return this.getList(list, funcCondition);
@@ -340,6 +347,30 @@ EnemyList.getUnmovedList = function() {
 
 AllyList.getUnmovedList = function() {
 	return AllUnitList.getUnmovedList(this.getMainList());
+};
+
+
+// alternate version of getAliveList that removes units who cannot be controlled (e.g. sleep)
+AllUnitList.getControllableList = function(list) {
+	var funcCondition = function(unit) {
+		return (unit.getAliveState() === AliveType.ALIVE && 
+		FusionControl.getFusionParent(unit) === null &&
+		StateControl.isTargetControllable(unit)); // bad states, e.g. sleep where you don't control
+	};
+		
+	return this.getList(list, funcCondition);
+};
+
+PlayerList.getControllableList = function() {
+	return AllUnitList.getControllableList(this.getMainList());
+};
+
+EnemyList.getControllableList = function() {
+	return AllUnitList.getControllableList(this.getMainList());
+};
+
+AllyList.getControllableList = function() {
+	return AllUnitList.getControllableList(this.getMainList());
 };
 
 
@@ -556,7 +587,7 @@ PlayerTurn._getDefaultCursorPos = function() {
 	
 	for (i = 0; i < count; i++) {
 		unit = list.getData(i);
-		if (!unit.isWait()) { //(unit.getImportance() === ImportanceType.LEADER) {
+		if (!unit.isWait() && StateControl.isTargetControllable(unit)) { //(unit.getImportance() === ImportanceType.LEADER) {
 			targetUnit = unit;
 			break;
 		}
@@ -673,11 +704,22 @@ BaseTurnLogoFlowEntry.doMainAction = function(isMusic) {
 TurnChangeStart.pushFlowEntries = function(straightFlow) {
 	// Prioritize the turn display.
 	//ONLY do all this shit if it's a new turn, i.e. turn list is equal no total units
-	var numPlayer = PlayerList.getAliveList().getCount();
-	var numEnemy = EnemyList.getAliveList().getCount();
-	var numAlly = AllyList.getAliveList().getCount();
+	var numPlayer = PlayerList.getControllableList().getCount();
+	var numEnemy = EnemyList.getControllableList().getCount();
+	var numAlly = AllyList.getControllableList().getCount();
 	var totalUnits = numPlayer + numEnemy + numAlly;
 	
+	
+	// if the turn list is empty, start a new turn
+	// MOVED HERE
+	if (BWSTurnSystem.turnList.length === 0) {
+		root.log('starting new turn')
+		BWSTurnSystem.newTurn();
+		BWSTurnSystem.initialiseList();
+	}	
+	
+	// maybe need another check here for berserked uits etc. 
+	// bewcause this is being called too many times
 	if (BWSTurnSystem.turnList.length === totalUnits) {// || root.getCurrentSession().getTurnCount() === 0) {
 		straightFlow.pushFlowEntry(ReinforcementAppearFlowEntry); // also do reinforcements now (BEFORE turn change)
 		// note any turn 1 reinforcements won't appear at all, but who does turn 1 reinforcements lol
@@ -690,7 +732,6 @@ TurnChangeStart.pushFlowEntries = function(straightFlow) {
 		// this stuff should be done for ALL units now (see below for changes)
 		straightFlow.pushFlowEntry(RecoveryAllFlowEntry);
 		straightFlow.pushFlowEntry(MetamorphozeCancelFlowEntry);
-		straightFlow.pushFlowEntry(BerserkFlowEntry);
 		straightFlow.pushFlowEntry(StateTurnFlowEntry); // this one already okay
 	}
 
@@ -778,17 +819,19 @@ MetamorphozeCancelFlowEntry._completeMemberData = function(turnChange) {
 	return this._dynamicEvent.executeDynamicEvent();
 };
 
-BerserkFlowEntry_isBerserkTurn = function() {
+BerserkFlowEntry._isBerserkTurn = function() {
 	var i, unit;
 	var playerList = PlayerList.getAliveList();
 	var enemyList = EnemyList.getAliveList();
 	var allyList = AllyList.getAliveList();
 	var list = [playerList, enemyList, allyList]//TurnControl.getActorList();	
 	
-	if (root.getCurrentSession().getTurnType() !== TurnType.PLAYER) {
+	// don't need this lol
+/* 	if (root.getCurrentSession().getTurnType() !== TurnType.PLAYER) {
 		return false;
 	}
-	
+	 */
+	 
 	for (j = 0; j < 3; j++) {
 		var count = list[j].getCount();
 		for (i = 0; i < count; i++) {
@@ -804,6 +847,62 @@ BerserkFlowEntry_isBerserkTurn = function() {
 	
 	return false;
 };
+
+
+// It's used If the unit who has a state of "Berserk" or "Auto AI" in the player exists.
+var PlayerBerserkTurn = defineObject(EnemyTurn,
+{
+	// can be called on enemy phase now
+	_getActorList: function() {
+		return PlayerList.getAliveList();//TurnControl.getActorList();
+	}, 
+	
+	
+	
+	_moveEndEnemyTurn: function() {
+		var i, unit;
+		//var list = PlayerList.getSortieList();
+		var playerList = PlayerList.getAliveList();
+		var enemyList = EnemyList.getAliveList();
+		var allyList = AllyList.getAliveList();
+		var list = [playerList, enemyList, allyList]//TurnControl.getActorList();	
+		
+		for (j = 0; j < 1; j++) { // j < 3
+			var count = list[j].getCount();
+			for (i = 0; i < count; i++) {
+				unit = list[j].getData(i);
+				if (StateControl.isBadStateOption(unit, BadStateOption.BERSERK)) {
+					unit.setWait(false);
+				}
+				else if (StateControl.isBadStateOption(unit, BadStateOption.AUTO)) {
+					unit.setWait(false);
+				}
+			}
+		}
+		
+		CurrentMap.setTurnSkipMode(false);
+		
+		return MoveResult.END;
+	},
+	
+	_isOrderAllowed: function(unit) {
+		if (!EnemyTurn._isOrderAllowed.call(this, unit)) {
+			return false;
+		}
+		
+		if (StateControl.isBadStateOption(unit, BadStateOption.BERSERK)) {
+			return true;
+		}
+		
+		if (StateControl.isBadStateOption(unit, BadStateOption.AUTO)) {
+			return true;
+		}
+		
+		return false;
+	}
+}
+);
+
 
 
 // reinforcement stuff.
@@ -834,9 +933,20 @@ ReinforcementChecker._checkReinforcementPage = function(posData, arr) {
 
 // reinforcements no longer appear here but in TurnChangeStart instead.
 TurnChangeEnd.pushFlowEntries = function(straightFlow) {
+	// but also do berserk stuff here??
+	var numPlayer = PlayerList.getControllableList().getCount();
+	var numEnemy = EnemyList.getControllableList().getCount();
+	var numAlly = AllyList.getControllableList().getCount();
+	var totalUnits = numPlayer + numEnemy + numAlly;
+	// turn list is updated before we get here so this check is
+	// basically the same as saying if it's about to be a new turn
+	// CHANGED NOW UHUHU HU
+	if (BWSTurnSystem.turnList.length === 0) {
+		straightFlow.pushFlowEntry(BerserkFlowEntry);
+	}
+
 	//straightFlow.pushFlowEntry(ReinforcementAppearFlowEntry);
 };
-
 
 
 // we only want units to remove "wait" upon a whole new turn, not just intermediate phases.
@@ -871,7 +981,7 @@ TurnControl.turnEnd = function() {
 	}
 }
 
-
+// when the map starts
 var TurnChangeMapStart = defineObject(BaseTurnChange,
 {
 	doLastAction: function() {
@@ -891,7 +1001,7 @@ var TurnChangeMapStart = defineObject(BaseTurnChange,
 		root.getCurrentSession().setTurnType(turnType);
 		// initialise bws turn list here.
 		BWSTurnSystem.initialiseList();
-		//root.log(BWSTurnSystem.turnList);
+		root.log(BWSTurnSystem.turnList);
 	},
 	
 	getStartEndType: function() {
@@ -926,8 +1036,19 @@ ReactionFlowEntry._completeMemberData = function(playerTurn) {
 	// moving the thing here rather than in unitwaitflowentry
 	// note this will probably screw with move again skills, might be best to restructure this
 	// so that it checks for the skill proc first, otherwise we shift list and NOTENTER
-	BWSTurnSystem.shiftList();
-	//root.log(BWSTurnSystem.turnList);		
+	// BUT only if not berserked since they don't use up turns
+	if (StateControl.isTargetControllable(this._targetUnit)) {
+		BWSTurnSystem.shiftList();
+		root.log(BWSTurnSystem.turnList);			
+	}
+	// BUT there is a change of a berserked ally killing something which means we'd
+	// have to update the list, so do that
+/* 	else {
+		root.log('oh no unctrollable update')
+		BWSTurnSystem.updateList();
+	} */
+	
+	
 	
 	if (this._targetUnit.getHp() === 0) {
 		return EnterResult.NOTENTER;
