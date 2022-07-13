@@ -1,5 +1,5 @@
 /*--------------------------------------------------------------------------
-	Berwick Saga Turn System, v0.1
+	Berwick Saga Turn System, v0.2
 	Created by robinco
 	
 	Changes the turn system to how it works in Berwick Saga. This means that
@@ -721,7 +721,6 @@ TurnChangeStart.pushFlowEntries = function(straightFlow) {
 	// maybe need another check here for berserked uits etc. 
 	// bewcause this is being called too many times
 	if (BWSTurnSystem.turnList.length === totalUnits) {// || root.getCurrentSession().getTurnCount() === 0) {
-		straightFlow.pushFlowEntry(ReinforcementAppearFlowEntry); // also do reinforcements now (BEFORE turn change)
 		// note any turn 1 reinforcements won't appear at all, but who does turn 1 reinforcements lol
 		if (this._isTurnAnimeEnabled()) {
 			straightFlow.pushFlowEntry(TurnAnimeFlowEntry); // using an animation (resource location/animations)
@@ -943,9 +942,8 @@ TurnChangeEnd.pushFlowEntries = function(straightFlow) {
 	// CHANGED NOW UHUHU HU
 	if (BWSTurnSystem.turnList.length === 0) {
 		straightFlow.pushFlowEntry(BerserkFlowEntry);
+		straightFlow.pushFlowEntry(ReinforcementAppearFlowEntry); // back to here
 	}
-
-	//straightFlow.pushFlowEntry(ReinforcementAppearFlowEntry);
 };
 
 
