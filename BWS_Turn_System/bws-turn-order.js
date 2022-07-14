@@ -339,6 +339,28 @@ var BWSTurnSystem = {
 			}
 		}
 		return currentIndex;
+	},
+	
+	// called by the End Turn command in map command list
+	// basically remove all 0s for the list and let the rest play out
+	endPlayerTurn: function() {
+		var turnListCount = this.turnList.length;
+		var playerList = PlayerList.getControllableList();
+		var playerListCount = playerList.getCount();
+		var unit;
+		
+		for (i = 0; i < turnListCount; i++) {
+			if (this.turnList[i] === TurnType.PLAYER) {
+				this.turnList.splice(i, 1);	
+			}
+		}
+		
+		// also set all units to wait (mainly a visual thing)
+		for (i = 0; i < playerListCount; i++) {
+			unit = playerList.getData(i);
+			unit.setWait(true);
+		}
+		TurnControl.turnEnd();
 	}
 
 };
@@ -630,10 +652,36 @@ PlayerTurn._getDefaultCursorPos = function() {
 MapCommand.configureCommands = function(groupArray) {
 	var mixer = createObject(CommandMixer);
 	
-	//mixer.pushCommand(MapCommand.TurnEnd, CommandActionType.TURNEND);
+	mixer.pushCommand(MapCommand.TurnEnd, CommandActionType.TURNEND);
 	
 	mixer.mixCommand(CommandLayoutType.MAPCOMMAND, groupArray, BaseListCommand);
 };
+
+
+MapCommand.TurnEnd = defineObject(BaseListCommand,
+{
+	openCommand: function() {
+		if (root.getBaseScene() === SceneType.FREE) {
+			this._saveCursor();
+		}
+		BWSTurnSystem.endPlayerTurn();
+		//TurnControl.turnEnd();
+	},
+	
+	moveCommand: function() {
+		return MoveResult.END;
+	},
+	
+	drawCommand: function() {
+	},
+	
+	_saveCursor: function() {
+		var playerTurnObject = SceneManager.getActiveScene().getTurnObject();
+		
+		playerTurnObject.setAutoCursorSave(false);
+	}
+}
+);
 
 
 // changes to save: by default this show up ALL THE TIME on player phase
@@ -1291,7 +1339,6 @@ var AutoActionBuilder = {
 	
 	_pushMove: function(unit, autoActionArray, combination) {
 		var autoAction;
-		//root.log(autoActionArray)
 		// check here... if combination is null, then update it somehow...
 		
 		this._pushScroll(unit, autoActionArray, combination);
@@ -1307,6 +1354,10 @@ var AutoActionBuilder = {
 	
 	_pushAttack: function(unit, autoActionArray, combination) {
 		var autoAction = createObject(WeaponAutoAction);
+		
+		// if we push scroll here the map will scroll to the attacked unit
+		// (may or may not be desirable?)
+		this._pushScroll(unit, autoActionArray, combination);
 		
 		autoAction.setAutoActionInfo(unit, combination);
 		autoActionArray.push(autoAction);
@@ -1329,7 +1380,8 @@ var AutoActionBuilder = {
 	_pushWait: function(unit, autoActionArray, combination) {
 		var autoAction = createObject(WaitAutoAction);
 		
-		this._pushScroll(unit, autoActionArray, combination);
+		// don't do this anymore since we scroll to unit beforehand
+		//this._pushScroll(unit, autoActionArray, combination);
 		autoAction.setAutoActionInfo(unit, combination);
 		autoActionArray.push(autoAction);
 	},
@@ -1341,7 +1393,8 @@ var AutoActionBuilder = {
 			return;
 		}
 		
-		if (EnvironmentControl.getScrollSpeedType() === SpeedType.HIGH) {
+		// change this, the first one causes visual glitches
+		if (false) {//EnvironmentControl.getScrollSpeedType() === SpeedType.HIGH) {
 			MapView.setScroll(unit.getMapX(), unit.getMapY());
 		}
 		else {
@@ -1355,10 +1408,13 @@ var AutoActionBuilder = {
 	}
 };
 
+
+
 // this is now called by _pushWait as well. (for enemies who don't move)
 // in this case combination is null so we need to make an empty _moveCource (lol spelling)
 // don't really know why it works but it does lol
 ScrollAutoAction.setAutoActionInfo = function(unit, combination) {
+	//root.log('we setting ScrollAutoAction info')
 	this._unit = unit;
 	if (combination !== null) {
 		this._moveCource = combination.cource;
@@ -1370,12 +1426,32 @@ ScrollAutoAction.setAutoActionInfo = function(unit, combination) {
 	this._simulateMove = createObject(SimulateMove);
 };
 
+// scroll smoothly when the auto action cursor is made
+// ideally we still want it to scroll BEFORE the cursor is made...
+AutoActionCursorsetAutoActionPos = function(x, y, isScroll) {
+	this._lockonCursor = createObject(LockonCursor);
+	this._lockonCursor.setPos(x, y);
+	
+	// When using the item, isScroll is false.
+	if (isScroll) {
+		if (!MapView.isVisible(x, y)) {
+			// Scroll if the target position is out of screen.
+			MapView.setScroll(x, y);
+			//root.log('fuckthis')
+			//MapLineScroll.startLineScroll(x, y);
+		}
+	}
+	// want to call this repeatedly...
+	// MapLineScroll.moveLineScroll();
+};
+
 
 // changes to EnemyTurn class
 // again there's quite a few changes so I've copied the who thing across and made changes
 // could probably still reduce it to aliases etc.
 
 // first we add a new EnemyTurnMode for the cursor to briefly focus on enemies before they move
+// plus one or scrolling to an enemy before that
 var EnemyTurnMode = {
 	TOP: 1,
 	PREACTION: 2,
@@ -1383,7 +1459,8 @@ var EnemyTurnMode = {
 	AUTOEVENTCHECK: 4,
 	END: 5,
 	IDLE: 6,
-	CURSORSHOW: 7
+	CURSORSHOW: 7,
+	MAPSCROLL: 8
 };
 
 
@@ -1399,6 +1476,8 @@ var EnemyTurn = defineObject(BaseTurn,
 	_orderCount: 0,
 	_orderMaxCount: 0,
 	_autoActionCursor: null,
+	_autoActionScroll: null,
+
 	
 	openTurnCycle: function() {
 		this._prepareTurnMemberData();
@@ -1411,6 +1490,9 @@ var EnemyTurn = defineObject(BaseTurn,
 	moveTurnCycle: function() {
 		var mode = this.getCycleMode();
 		var result = MoveResult.CONTINUE;
+		
+		//root.log('enemy turn mode: ' + mode)
+		//root.log(root.getCurrentSession().getScrollPixelX() + '/' + root.getCurrentSession().getScrollPixelY())
 		
 		// If _isSkipAllowed returns true, check the skip.
 		// With this, the skip at the battle doesn't affect the skip for turn.
@@ -1439,6 +1521,10 @@ var EnemyTurn = defineObject(BaseTurn,
 		else if (mode === EnemyTurnMode.CURSORSHOW) {
 			result = this._moveCursorShow();
 		}
+		else if (mode === EnemyTurnMode.MAPSCROLL) {
+			result = this._moveMapScroll();
+		}
+
 		
 		return result;
 	},
@@ -1485,6 +1571,7 @@ var EnemyTurn = defineObject(BaseTurn,
 		this._resetOrderMark();
 		this.changeCycleMode(EnemyTurnMode.TOP);
 		this._autoActionCursor = createObject(AutoActionCursor);
+		this._autoActionScroll = createObject(ScrollAutoAction);
 		
 		// There is a possibility that the reinforcements appear when the player's turn ends,
 		// execute the marking when the enemy's turn starts.
@@ -1599,6 +1686,7 @@ var EnemyTurn = defineObject(BaseTurn,
 			
 			// Get the unit who should move.
 			this._orderUnit = this._checkNextOrderUnit();
+			
 			if (this._orderUnit === null) {
 				// No more enemy exists, so enter to end the return.
 				this.changeCycleMode(EnemyTurnMode.END);
@@ -1618,8 +1706,16 @@ var EnemyTurn = defineObject(BaseTurn,
 				// It's possible to refer to the control character of \act at the event.
 				
 				//root.log('unit name: ' + this._orderUnit.getName())
+	
 				root.getCurrentSession().setActiveEventUnit(this._orderUnit);
+				
+				// start scrolling to enemy
+				this._autoActionScroll.setAutoActionInfo(this._orderUnit, null);
+				this._autoActionScroll.enterAutoAction();
+				
+				// set the position of the auto cursor
 				this._autoActionCursor.setAutoActionPos(this._orderUnit.getMapX(), this._orderUnit.getMapY(), true);
+				
 				
 				
 				this._straightFlow.resetStraightFlow();
@@ -1627,15 +1723,31 @@ var EnemyTurn = defineObject(BaseTurn,
 				// Execute a flow of PreAction.
 				// PreAction is an action before the unit moves or attacks,
 				// such as ActivePatternFlowEntry.
-				result = this._straightFlow.enterStraightFlow();
+				result = this._straightFlow.enterStraightFlow();	
+
+
+
+				// condition here...?
+				// if we're skipping, create autoaction thing now to prevent an error
+/* 				if (this._isSkipMode()) {
+					this._createAutoAction();
+					this._startAutoAction();
+				}				
+				 */
+							
+				
 				if (result === EnterResult.NOTENTER) {
-					if (this._startAutoAction()) {
+					
+
+					
+ 					if (this._startAutoAction()) {
 						// Change a mode because graphical action starts.
 						//this.changeCycleMode(EnemyTurnMode.AUTOACTION);
 						// instead of going to autoaction, we first go to cursorshow first
 						// which then changes to autoaction (don't really understand but hey it works)
-						this.changeCycleMode(EnemyTurnMode.CURSORSHOW);
-						break;
+						//this.changeCycleMode(EnemyTurnMode.CURSORSHOW);
+						this.changeCycleMode(EnemyTurnMode.MAPSCROLL);
+						break; 
 					}
 					
 					
@@ -1719,20 +1831,48 @@ var EnemyTurn = defineObject(BaseTurn,
 		
 		if (isSkipMode || this._autoActionCursor.moveAutoActionCursor() !== MoveResult.CONTINUE) {
 			if (isSkipMode) {
+				
 				this._autoActionCursor.endAutoActionCursor();
 			}
 			
-			// again removing this gets rid of an error, idrk why
-			//if (this._enterAttack() === EnterResult.NOTENTER) {
-			//	return MoveResult.END;
-			//}
-		
+			// move on to autoaction ehich is next
+			//this._startAutoAction();
 			this.changeCycleMode(EnemyTurnMode.AUTOACTION);
+			
 		}
 		
 		return MoveResult.CONTINUE;
 	},
 	
+	_moveMapScroll: function() {
+		var isSkipMode = this._isSkipMode();
+		
+		if (isSkipMode || this._autoActionScroll.moveAutoAction() !== MoveResult.CONTINUE) {
+			if (isSkipMode) {
+				//this._autoActionScroll.endAutoActionCursor();
+
+				// below line is kind of weird...but it prevents a fatal bug that would occur
+				// if you skip during the map scrolling (not sure what was causing it tbh)
+				this._completeTurnMemberData();
+				
+				
+				this.changeCycleMode(EnemyTurnMode.AUTOACTION);
+			}
+			
+			else {
+				// move on to autoaction ehich is next
+				this._startAutoAction();
+				this.changeCycleMode(EnemyTurnMode.CURSORSHOW);
+			}
+			
+
+		}
+		
+		return MoveResult.CONTINUE;
+	},	
+	
+
+			
 	_drawPreAction: function() {
 		this._straightFlow.drawStraightFlow();
 	},
@@ -1745,9 +1885,13 @@ var EnemyTurn = defineObject(BaseTurn,
 		this._eventChecker.drawEventChecker();
 	},
 	
- 	_drawCurosrShow: function() {
+ 	_drawCursorShow: function() {
 		this._autoActionCursor.drawAutoActionCursor();
 	},
+	
+ 	_drawMapScroll: function() {
+		this._autoActionScroll.drawAutoAction();
+	},	
 	
 	_drawProgress: function() {
 		var n;
@@ -1788,7 +1932,7 @@ var EnemyTurn = defineObject(BaseTurn,
 		if (!this._isActionAllowed()) {
 			return false;
 		}
-		
+			
 		// If AutoAction cannot be created, check the next unit.
 		if (!this._createAutoAction()) {
 			return false;
@@ -1797,6 +1941,7 @@ var EnemyTurn = defineObject(BaseTurn,
 		while (this._autoActionIndex < this._autoActionArray.length) {
 			result = this._autoActionArray[this._autoActionIndex].enterAutoAction();
 			if (result === EnterResult.OK) {
+				//root.log('we return true')
 				return true;
 			}
 			
