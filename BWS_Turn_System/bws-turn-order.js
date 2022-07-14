@@ -1,5 +1,5 @@
 /*--------------------------------------------------------------------------
-	Berwick Saga Turn System, v0.2
+	Berwick Saga Turn System, v0.3
 	Created by robinco
 	
 	Changes the turn system to how it works in Berwick Saga. This means that
@@ -13,8 +13,6 @@
 	  feel free to change.
 	
 	Important notes/known issues:
-	- Set scroll speed in the Config to normal/slow (fast has some visual 
-	  bugs which I haven't worked out yet)
 	- There may be a problem with refreshers if they move last
 	- Consider turning on unit markers and/or HP bars to see unit 
 	  affiliation for waiting units
@@ -38,6 +36,11 @@
 		  The turn list is now update correctly in these scenarios
 		- Bug fix for units which change affilation via an event --
 		  the turn list is now correctly updated
+	14/07/2022: v0.3,
+		- The camera will now smoothly scroll to enemies before their action
+		- Fixed the visual glitch that occurs when Scroll Speed is Fast
+		- Readded the End Turn map command - it removes all remaining player
+		  actions and lets the rest of the turn play out
 					   
 --------------------------------------------------------------------------*/
 
