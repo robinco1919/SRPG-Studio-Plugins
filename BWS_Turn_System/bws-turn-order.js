@@ -41,6 +41,9 @@
 		- Fixed the visual glitch that occurs when Scroll Speed is Fast
 		- Readded the End Turn map command - it removes all remaining player
 		  actions and lets the rest of the turn play out
+	28/07/2022: v0.4,
+		- Fixed a bug where undeployed player units would add to the turn list
+		  (thanks to Anarch16sync for noticing and providing a fix)
 					   
 --------------------------------------------------------------------------*/
 
@@ -382,7 +385,7 @@ AllUnitList.getUnmovedList = function(list) {
 };
 
 PlayerList.getUnmovedList = function() {
-	return AllUnitList.getUnmovedList(this.getMainList());
+    return AllUnitList.getUnmovedList(this.getSortieList()); //Changed to getSortieList so it only counts deployed units
 };
 
 EnemyList.getUnmovedList = function() {
@@ -406,7 +409,7 @@ AllUnitList.getControllableList = function(list) {
 };
 
 PlayerList.getControllableList = function() {
-	return AllUnitList.getControllableList(this.getMainList());
+    return AllUnitList.getControllableList(this.getSortieList()); //Changed to getSortieList so it only counts deployed units
 };
 
 EnemyList.getControllableList = function() {
@@ -1036,6 +1039,48 @@ TurnChangeEnd._checkActorList = function() {
 };
 
 
+// Claris thing
+/* ReinforcementChecker._setMapScroll = function() {
+	var session = root.getCurrentSession();
+	// obtain the most recent enemy
+	var Unit = EnemyList.getAliveList().getData(EnemyList.getAliveList().getCount()-1)
+	// if xScroll is at 0X or off-map...
+	if (this._xScroll <= 0){
+		//log adjustment.
+		root.log("adjusted scroll X")
+		//set it to enemy X.
+		this._xScroll === Unit.getMapX();
+	}
+	else{
+		//otherwise, set normal scroll pixel X.
+		session.setScrollPixelX(this._xScroll * GraphicsFormat.MAPCHIP_WIDTH);
+	}
+	// if yScroll is at 0Y or off-map...
+	if (this._yScroll <= 0){
+		//log adjustment.
+		root.log("adjusted scroll Y")
+		//set it to enemy Y.
+		this._yScroll === Unit.getMapY();
+	}
+	else{
+		//otherwise, set normal scroll pixel Y.
+		session.setScrollPixelY(this._yScroll * GraphicsFormat.MAPCHIP_HEIGHT);
+	}
+}; */
+
+
+// again maybe want to scroll there rather than teleport?
+ReinforcementChecker._setMapScroll = function() {
+	var session = root.getCurrentSession();
+	
+	session.setScrollPixelX(this._xScroll * GraphicsFormat.MAPCHIP_WIDTH);
+	session.setScrollPixelY(this._yScroll * GraphicsFormat.MAPCHIP_HEIGHT);
+};
+	
+
+
+
+
 
 TurnControl.turnEnd = function() {
 	// There is a possibility to be called from the event, call getBaseScene, not getCurrentScene.
@@ -1149,8 +1194,6 @@ ReactionFlowEntry._completeMemberData = function(playerTurn) {
 	
 	// shift turn list (remove 1st)
 	// moving the thing here rather than in unitwaitflowentry
-	// note this will probably screw with move again skills, might be best to restructure this
-	// so that it checks for the skill proc first, otherwise we shift list and NOTENTER
 	// BUT only if not berserked since they don't use up turns
 	if (StateControl.isTargetControllable(this._targetUnit)) {
 		BWSTurnSystem.shiftList();
@@ -1439,7 +1482,9 @@ AutoActionCursorsetAutoActionPos = function(x, y, isScroll) {
 	if (isScroll) {
 		if (!MapView.isVisible(x, y)) {
 			// Scroll if the target position is out of screen.
+			
 			MapView.setScroll(x, y);
+			
 			//root.log('fuckthis')
 			//MapLineScroll.startLineScroll(x, y);
 		}
