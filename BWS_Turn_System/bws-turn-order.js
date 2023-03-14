@@ -44,6 +44,9 @@
 	28/07/2022: v0.4,
 		- Fixed a bug where undeployed player units would add to the turn list
 		  (thanks to Anarch16sync for noticing and providing a fix)
+	13/03/2023: v0.5,
+		- Fixed a bug where loading a map save file would make the first turn
+		  work like a normal turn without initializing the list.
 					   
 --------------------------------------------------------------------------*/
 
@@ -371,6 +374,13 @@ var BWSTurnSystem = {
 
 };
 
+var aliasBattleSetup = FreeAreaScene._completeSceneMemberData;
+	FreeAreaScene._completeSceneMemberData= function() {
+		if (root.getSceneController().isActivatedFromSaveFile()){
+			BWSTurnSystem.initialiseList();
+		}
+		aliasBattleSetup.call(this);
+	};
 
 
 AllUnitList.getUnmovedList = function(list) {
