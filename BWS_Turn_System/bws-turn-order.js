@@ -47,6 +47,9 @@
 	13/03/2023: v0.5,
 		- Fixed a bug where loading a map save file would make the first turn
 		  work like a normal turn without initializing the list.
+	27/03/2023: v0.6,
+		- Fixed a bug with Re-Action skills, they wouldn't trigger for player units,
+		  and would crash on enemy units.
 					   
 --------------------------------------------------------------------------*/
 
@@ -233,12 +236,12 @@ var BWSTurnSystem = {
 		
 			for (i = 0; i < count; i++) {
 				unit = list[j].getData(i);
-				unit.setWait(false);//this._removeWaitState(unit);
+				TurnChangeEnd._removeWaitState(unit); //we have to use this function to manage Re-Action cooldowns.
 				
 				unit = FusionControl.getFusionChild(unit);
 				if (unit !== null) {
 					// Deactivate a wait state of the units who are fused.
-					unit.setWait(false);//this._removeWaitState(unit);
+					TurnChangeEnd._removeWaitState(unit);
 				}	
 			}
 		}	
@@ -1205,13 +1208,13 @@ ReactionFlowEntry._completeMemberData = function(playerTurn) {
 	// shift turn list (remove 1st)
 	// moving the thing here rather than in unitwaitflowentry
 	// BUT only if not berserked since they don't use up turns
-	if (StateControl.isTargetControllable(this._targetUnit)) {
+	/*if (StateControl.isTargetControllable(this._targetUnit)) {
 		BWSTurnSystem.shiftList();
 		root.log(BWSTurnSystem.turnList);			
-	}
+	}*/
 	// BUT there is a change of a berserked ally killing something which means we'd
 	// have to update the list, so do that
-/* 	else {
+	/* 	else {
 		root.log('oh no unctrollable update')
 		BWSTurnSystem.updateList();
 	} */
@@ -1219,24 +1222,44 @@ ReactionFlowEntry._completeMemberData = function(playerTurn) {
 	
 	
 	if (this._targetUnit.getHp() === 0) {
+		if (StateControl.isTargetControllable(this._targetUnit)) {
+			BWSTurnSystem.shiftList();
+			// root.log(BWSTurnSystem.turnList);			
+		}
 		return EnterResult.NOTENTER;
 	}
 	
 	// Action again doesn't occur when it's unlimited action.
 	if (Miscellaneous.isPlayerFreeAction(this._targetUnit)) {
+		if (StateControl.isTargetControllable(this._targetUnit)) {
+			BWSTurnSystem.shiftList();
+			// root.log(BWSTurnSystem.turnList);			
+		}
 		return EnterResult.NOTENTER;
 	}
 	
 	if (this._targetUnit.getReactionTurnCount() !== 0) {
+		if (StateControl.isTargetControllable(this._targetUnit)) {
+			BWSTurnSystem.shiftList();
+			// root.log(BWSTurnSystem.turnList);			
+		}
 		return EnterResult.NOTENTER;
 	}
 	
 	skill = SkillControl.getBestPossessionSkill(this._targetUnit, SkillType.REACTION);
 	if (skill === null) {
+		if (StateControl.isTargetControllable(this._targetUnit)) {
+			BWSTurnSystem.shiftList();
+			// root.log(BWSTurnSystem.turnList);			
+		}
 		return EnterResult.NOTENTER;
 	}
 	
 	if (!Probability.getInvocationProbabilityFromSkill(this._targetUnit, skill)) {
+		if (StateControl.isTargetControllable(this._targetUnit)) {
+			BWSTurnSystem.shiftList();
+			// root.log(BWSTurnSystem.turnList);			
+		}
 		return EnterResult.NOTENTER;
 	}
 	
