@@ -50,6 +50,9 @@
 	27/03/2023: v0.6,
 		- Fixed a bug with Re-Action skills, they wouldn't trigger for player units,
 		  and would crash on enemy units.
+	06/08/2024: v0.7,
+		- Added Compatibility with SearchMap plugin
+		- Fixed undefined i and j variables in for loops
 					   
 --------------------------------------------------------------------------*/
 
@@ -82,10 +85,10 @@ var BWSTurnSystem = {
 		var numAlly = AllyList.getControllableList().getCount();
 		var totalUnits = numPlayer + numEnemy + numAlly;
 		
-		root.log(numPlayer + ' players')
-		root.log(numEnemy + ' enemies')
-		root.log(numAlly + ' allies')
-		root.log(totalUnits + ' total')
+		//root.log(numPlayer + ' players')
+		//root.log(numEnemy + ' enemies')
+		//root.log(numAlly + ' allies')
+		//root.log(totalUnits + ' total')
 		
 		this.turnList = []; // empty list
 		this.numUnitArray = [numPlayer, numEnemy, numAlly]; // might use this later
@@ -263,7 +266,7 @@ var BWSTurnSystem = {
 		// we'll have to look at the affiliation of who has died/left, then remove the last(?) occurence of that affiliation
 		
 		// calling it all the time, the function will sort out
-		
+		var i;
 		var numPlayer = PlayerList.getUnmovedList().getCount();
 		var numEnemy = EnemyList.getUnmovedList().getCount();
 		var numAlly = AllyList.getUnmovedList().getCount();
@@ -271,9 +274,9 @@ var BWSTurnSystem = {
 		var numEnemiesInList = this.countType(TurnType.ENEMY);;
 		var numAlliesInList = this.countType(TurnType.ALLY);;
 
-		root.log(numPlayer + ' / ' + numPlayersInList)
-		root.log(numEnemy + ' / ' + numEnemiesInList)
-		root.log(numAlly + ' / ' + numAlliesInList)
+		// root.log(numPlayer + ' / ' + numPlayersInList)
+		// root.log(numEnemy + ' / ' + numEnemiesInList)
+		// root.log(numAlly + ' / ' + numAlliesInList)
 		
 		// 1st case: number of player ne no of 0s in list
 		// doing for rather than while loops in case I stuff up to avoid infinite loops
@@ -329,7 +332,7 @@ var BWSTurnSystem = {
 	countType: function(turnType) {
 		// counts the number of a particular affiliation in the turn list
 		var numInList = 0;
-		for (i = 0; i < this.turnList.length; i++) {
+		for (var i = 0; i < this.turnList.length; i++) {
 			if (this.turnList[i] === turnType) {
 				numInList += 1;
 			}
@@ -342,7 +345,7 @@ var BWSTurnSystem = {
 		var count = arr.length;
 		var currentIndex = count - 1;
 		
-		for (i = currentIndex; i >= 0; i--) {
+		for (var i = currentIndex; i >= 0; i--) {
 			if (arr[i] === target) {
 				return currentIndex;
 			}
@@ -356,6 +359,7 @@ var BWSTurnSystem = {
 	// called by the End Turn command in map command list
 	// basically remove all 0s for the list and let the rest play out
 	endPlayerTurn: function() {
+		var i;
 		var turnListCount = this.turnList.length;
 		var playerList = PlayerList.getControllableList();
 		var playerListCount = playerList.getCount();
@@ -472,7 +476,7 @@ MapParts.BWSTurnWindow = defineObject(BaseMapParts,
 		var turnIcon;
 		var x2 = x;
 		
-		for (i = 0; i < 5; i++) {
+		for (var i = 0; i < 5; i++) {
 			if (i+1 > BWSTurnSystem.turnList.length) {break}
 			turnIcon = BWSTurnSystem.turnList[i];
 			pic.drawParts(x2, y, turnIcon*width, 0, width, height);
@@ -715,9 +719,9 @@ SaveScreenLauncher.isLaunchable = function() {
 		var list = [playerList, enemyList, allyList]
 		var unit, count;
 		
-		for (i = 0; i < 3; i++) {
+		for (var i = 0; i < 3; i++) {
 			count = list[i].getCount();
-			for (j = 0; j < count; j++) {
+			for (var j = 0; j < count; j++) {
 				unit = list[i].getData(j);
 				// if there are ANY waiting units, it is not the start of the turn
 				// I guess berserked units could stuff this up though -_-
@@ -799,7 +803,7 @@ TurnChangeStart.pushFlowEntries = function(straightFlow) {
 	// if the turn list is empty, start a new turn
 	// MOVED HERE
 	if (BWSTurnSystem.turnList.length === 0) {
-		root.log('starting new turn')
+		// root.log('starting new turn')
 		BWSTurnSystem.newTurn();
 		BWSTurnSystem.initialiseList();
 	}	
@@ -832,7 +836,7 @@ RecoveryAllFlowEntry._completeMemberData = function(turnChange) {
 	var enemyList = EnemyList.getAliveList();
 	var allyList = AllyList.getAliveList();
 	var list = [playerList, enemyList, allyList]//TurnControl.getActorList();
-	for (j = 0; j < 3; j++) {
+	for (var j = 0; j < 3; j++) {
 		var count = list[j].getCount();
 		for (i = 0 ; i < count; i++) {
 			unit = list[j].getData(i);
@@ -875,7 +879,7 @@ MetamorphozeCancelFlowEntry._completeMemberData = function(turnChange) {
 	var allyList = AllyList.getAliveList();
 	var list = [playerList, enemyList, allyList]//TurnControl.getActorList();	
 	
-		for (j = 0; j < 3; j++) {
+		for (var j = 0; j < 3; j++) {
 			var count = list[j].getCount();
 			for (i = 0 ; i < count; i++) {
 				unit = list[j].getData(i);
@@ -917,7 +921,7 @@ BerserkFlowEntry._isBerserkTurn = function() {
 	}
 	 */
 	 
-	for (j = 0; j < 3; j++) {
+	for (var j = 0; j < 3; j++) {
 		var count = list[j].getCount();
 		for (i = 0; i < count; i++) {
 			unit = list[j].getData(i);
@@ -952,7 +956,7 @@ var PlayerBerserkTurn = defineObject(EnemyTurn,
 		var allyList = AllyList.getAliveList();
 		var list = [playerList, enemyList, allyList]//TurnControl.getActorList();	
 		
-		for (j = 0; j < 1; j++) { // j < 3
+		for (var j = 0; j < 1; j++) { // j < 3
 			var count = list[j].getCount();
 			for (i = 0; i < count; i++) {
 				unit = list[j].getData(i);
@@ -1127,7 +1131,7 @@ var TurnChangeMapStart = defineObject(BaseTurnChange,
 		root.getCurrentSession().setTurnType(turnType);
 		// initialise bws turn list here.
 		BWSTurnSystem.initialiseList();
-		root.log(BWSTurnSystem.turnList);
+		// root.log(BWSTurnSystem.turnList);
 	},
 	
 	getStartEndType: function() {
@@ -1193,7 +1197,7 @@ MapSequenceCommand._doLastAction = function() {
 		this._parentTurnObject.recordPlayerAction(true);
 		// if unit is dead, shift list
 		BWSTurnSystem.shiftList();
-		root.log(BWSTurnSystem.turnList);			
+		// root.log(BWSTurnSystem.turnList);			
 		return 1;
 	}
 
@@ -1210,8 +1214,8 @@ ReactionFlowEntry._completeMemberData = function(playerTurn) {
 	// BUT only if not berserked since they don't use up turns
 	/*if (StateControl.isTargetControllable(this._targetUnit)) {
 		BWSTurnSystem.shiftList();
-		root.log(BWSTurnSystem.turnList);			
 	}*/
+		// root.log(BWSTurnSystem.turnList);			
 	// BUT there is a change of a berserked ally killing something which means we'd
 	// have to update the list, so do that
 	/* 	else {
@@ -1472,8 +1476,8 @@ var AutoActionBuilder = {
 			return;
 		}
 		
-		// change this, the first one causes visual glitches
-		if (false) {//EnvironmentControl.getScrollSpeedType() === SpeedType.HIGH) {
+		// change this, the first one causes visual glitches (false) 
+		if  (false) {
 			MapView.setScroll(unit.getMapX(), unit.getMapY());
 		}
 		else {
@@ -1515,9 +1519,7 @@ AutoActionCursorsetAutoActionPos = function(x, y, isScroll) {
 	if (isScroll) {
 		if (!MapView.isVisible(x, y)) {
 			// Scroll if the target position is out of screen.
-			
 			MapView.setScroll(x, y);
-			
 			//root.log('fuckthis')
 			//MapLineScroll.startLineScroll(x, y);
 		}
@@ -1796,6 +1798,18 @@ var EnemyTurn = defineObject(BaseTurn,
 				
 				// set the position of the auto cursor
 				this._autoActionCursor.setAutoActionPos(this._orderUnit.getMapX(), this._orderUnit.getMapY(), true);
+
+				//Added Compatibility with Search Map
+				if (typeof SearchStateType !== 'undefined' && SearchStateType !== null) { 
+					if (CurrentMap.getSearchState() !== SearchStateType.NOTSEARCH) {
+						x = this._orderUnit.getMapX();
+						y = this._orderUnit.getMapY();
+						index = CurrentMap.getIndex(x, y);
+						if (!CurrentMap.isVisible(index, VisibleType)) {
+							this._autoActionCursor.endAutoActionCursor(); // get rid of cursor
+						}
+					}
+				}
 				
 				
 				
