@@ -367,7 +367,9 @@ var BWSTurnSystem = {
 		
 		for (i = 0; i < turnListCount; i++) {
 			if (this.turnList[i] === TurnType.PLAYER) {
-				this.turnList.splice(i, 1);	
+				this.turnList.splice(i, 1);
+				//Check the same index again after splicing, when the list has no players the loop ends.
+				i--
 			}
 		}
 		
